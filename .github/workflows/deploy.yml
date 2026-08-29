@@ -1,0 +1,78 @@
+name: test & deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# деплой робить сам GitHub Pages, тому потрібні саме ці дозволи
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# паралельні деплої не потрібні, але поточний обриваємо тільки якщо він ще в черзі
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Юніт-тести
+        run: npm test
+
+      - name: Браузер для e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E
+        # e2e ганяє продакшн-збірку; base тут кореневий, бо preview віддає з "/"
+        run: npm run test:e2e
+
+      - name: Звіт Playwright, якщо впало
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Збірка
+        # Pages віддає проєкт із /<назва-репо>/ — без цього білі сторінки і 404
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
