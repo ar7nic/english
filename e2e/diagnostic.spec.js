@@ -13,8 +13,8 @@ import {
 test.describe("проходження", () => {
   test("від інтро до звіту", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("англійської граматики");
-    await expect(page.locator(".gd-lead")).toContainText("80 питань");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("English test");
+    await expect(page.locator(".gd-lead")).toContainText("80–95 питань");
 
     await page.getByRole("button", { name: "Почати тест" }).click();
     await expect(page.locator(".gd-tapemeta").first()).toContainText("01 / 80");
@@ -265,7 +265,7 @@ test.describe("PWA", () => {
   test("маніфест, іконки і service worker на місці", async ({ page, request }) => {
     await page.goto("/");
     const manifest = await (await request.get("/manifest.webmanifest")).json();
-    expect(manifest.name).toContain("граматики");
+    expect(manifest.name).toBe("English test");
     expect(manifest.display).toBe("standalone");
     expect(manifest.lang).toBe("uk");
     // start_url і scope відносні — однаково працюють з кореня і з /<репо>/
@@ -300,7 +300,7 @@ test.describe("PWA", () => {
     await page.reload();
     await context.setOffline(true);
     await page.reload();
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("англійської граматики");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("English test");
 
     // шрифти теж у кеші — офлайн виглядає так само, як онлайн
     await page.waitForFunction(() => document.fonts.status === "loaded");

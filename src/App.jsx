@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { POOL, SUITES } from "./data/questions.js";
-import { buildProbes, buildSelection, markUsed, TEST_LEN } from "./lib/selection.js";
+import {
+  buildProbes,
+  buildSelection,
+  markUsed,
+  MAX_TEST_LEN,
+  TEST_LEN,
+} from "./lib/selection.js";
 import { scoreAttempt } from "./lib/scoring.js";
 import { KEYS, readJSON, storage, writeJSON } from "./lib/storage.js";
 import {
@@ -219,7 +225,7 @@ export default function App() {
       <div className="gd">
         <Intro
           testLen={TEST_LEN}
-          poolLen={POOL.length}
+          maxLen={MAX_TEST_LEN}
           suitesLen={SUITES.length}
           runNo={runNo}
           attemptsCount={attempts.length}

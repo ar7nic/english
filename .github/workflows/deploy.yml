@@ -62,7 +62,12 @@ jobs:
           BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build
 
+      # enablement вмикає Pages через API, якщо сайт ще не створено руками.
+      # Без цього на свіжому репозиторії крок падає з 404 Not Found.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

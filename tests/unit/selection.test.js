@@ -4,6 +4,7 @@ import {
   buildProbes,
   buildSelection,
   markUsed,
+  MAX_TEST_LEN,
   MAX_WEAK_SUITES,
   PROBES_PER_SUITE,
   QID,
@@ -140,6 +141,13 @@ describe("buildProbes", () => {
     expect(probes.length).toBe(MAX_WEAK_SUITES * PROBES_PER_SUITE);
     expect(probes.length).toBe(15);
     expect(new Set(probes).size).toBe(probes.length);
+  });
+
+  it("найдовша спроба не перевищує обіцяних інтро 95 питань", () => {
+    // інтро показує діапазон TEST_LEN–MAX_TEST_LEN, тому стеля має збігатися
+    const probes = buildProbes(sel, answersFor(sel, false), {}, fixedRng);
+    expect(sel.length + probes.length).toBe(MAX_TEST_LEN);
+    expect(MAX_TEST_LEN).toBe(95);
   });
 
   it("не повторює питання з базової частини", () => {

@@ -16,8 +16,8 @@ export default defineConfig({
       injectRegister: "auto",
       includeAssets: ["favicon.svg", "icon-192.png", "icon-512.png", "icon-maskable-512.png"],
       manifest: {
-        name: "Тест з англійської граматики",
-        short_name: "Граматика",
+        name: "English test",
+        short_name: "English test",
         description:
           "Офлайн-діагностика англійської граматики A2 → B2. Усі дані лишаються на пристрої.",
         lang: "uk",

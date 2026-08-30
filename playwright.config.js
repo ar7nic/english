@@ -18,7 +18,9 @@ export default defineConfig({
   webServer: {
     command: "npm run build && npm run preview -- --port 4173 --strictPort",
     url: "http://localhost:4173",
-    reuseExistingServer: !process.env.CI,
+    // навмисно НЕ перевикористовуємо чужий сервер: інакше playwright пропускає
+    // build і мовчки ганяє тести по старій збірці — двічі спіймався на цьому
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });
