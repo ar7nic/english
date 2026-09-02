@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { plural } from "../lib/format.js";
 
 /* Екран питання: стрічка прогресу, картка з питанням, навігація.
@@ -18,11 +18,47 @@ export default function Question({
   onFinishBase,
   onDone,
 }) {
+  /* Нуль — це валідний індекс варіанта, тому порівнюємо саме так,
+     а не через істинність значення. */
+  const isAnswered = (v) => v !== undefined && v !== "";
+
   const cur = answers[idx];
+  const answered = isAnswered(cur);
   const last = idx === items.length - 1;
   const inProbe = idx >= selLen;
   const atHalfway = !inProbe && idx === Math.floor(selLen / 2);
   const atBaseEnd = idx === selLen - 1 && probesLen === 0;
+
+  /* Enter гортає далі — однаково на питаннях з вибором і з полем вводу.
+     Слухач саме на window, а не на обгортці: на свіжому питанні з варіантами
+     фокус часто ні на чому, подія йде в <body> і до React-обробника на
+     обгортці не дійшла б. Компонент живий лише поки триває тест, тож на
+     Intro, Report і History це не діє. */
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key !== "Enter" || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+      if (last) return; // з останнього питання Enter нікуди не веде і нічого не завершує
+
+      const target = e.target;
+      const onOption = target instanceof HTMLButtonElement && target.classList.contains("gd-opt");
+      // «Далі», «Назад» і позначки стрічки обробляють Enter самі —
+      // інакше вийшов би подвійний перехід
+      if (target instanceof HTMLButtonElement && !onOption) return;
+
+      // Enter — це «відповів і далі», а не «пропустити»: без відповіді
+      // він нікуди не веде. Пропуск питання лишається свідомим кліком.
+      // Дефолт тут навмисно не гасимо: якщо фокус стоїть на варіанті,
+      // цей самий Enter його вибере, і наступний уже погортає.
+      if (!answered) return;
+
+      // відповідь є — на варіанті гасимо синтетичний click, щоб Enter
+      // тільки гортав і не переписував уже зроблений вибір
+      if (onOption) e.preventDefault();
+      onGo(idx + 1);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [idx, last, answered, onGo]);
 
   return (
     <div className="gd-wrap">
@@ -30,10 +66,7 @@ export default function Question({
         {items.map((_, i) => (
           <button
             key={i}
-            className={
-              "gd-tick clickable " +
-              (i === idx ? "here" : answers[i] !== undefined && answers[i] !== "" ? "filled" : "")
-            }
+            className={"gd-tick clickable " + (i === idx ? "here" : isAnswered(answers[i]) ? "filled" : "")}
             onClick={() => onGo(i)}
             aria-label={`Питання ${i + 1}`}
           />
@@ -84,16 +117,21 @@ export default function Question({
         <div className="gd-q">{q.q}</div>
 
         {q.t === "mc" ? (
-          q.o.map((opt, i) => (
-            <button
-              key={i}
-              className={"gd-opt " + (Number(cur) === i ? "sel" : "")}
-              onClick={() => onAnswer(i)}
-            >
-              <span className="gd-key">{"ABCD"[i]}</span>
-              {opt}
-            </button>
-          ))
+          <>
+            {q.o.map((opt, i) => (
+              <button
+                key={i}
+                className={"gd-opt " + (Number(cur) === i ? "sel" : "")}
+                onClick={() => onAnswer(i)}
+              >
+                <span className="gd-key">{"ABCD"[i]}</span>
+                {opt}
+              </button>
+            ))}
+            <div className="gd-hint">
+              {answered ? "Enter — наступне питання." : "Оберіть варіант, далі Enter."}
+            </div>
+          </>
         ) : (
           <>
             <input
@@ -102,15 +140,13 @@ export default function Question({
               value={cur ?? ""}
               placeholder="впишіть слово або слова"
               onChange={(e) => onAnswer(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !last) onGo(idx + 1);
-              }}
               autoComplete="off"
               autoCapitalize="off"
               spellCheck={false}
             />
             <div className="gd-hint">
-              Скорочення на кшталт don't теж приймаються. Enter — наступне питання.
+              Скорочення на кшталт don't теж приймаються.{" "}
+              {answered ? "Enter — наступне питання." : "Впишіть відповідь, далі Enter."}
             </div>
           </>
         )}

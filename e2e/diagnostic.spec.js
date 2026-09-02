@@ -48,6 +48,116 @@ test.describe("проходження", () => {
   });
 });
 
+test.describe("клавіатура", () => {
+  const counter = (page) => page.locator(".gd-tapemeta").first();
+
+  test("Enter гортає питання з вибором відповіді", async ({ page }) => {
+    await startTest(page);
+    // перше питання завжди mc: вибірка сортує mc перед gap у межах слоту
+    expect(await questionCard(page).locator(".gd-opt").count()).toBe(4);
+
+    await expect(counter(page)).toContainText("01 / 80");
+    await questionCard(page).locator(".gd-opt").first().click();
+    await page.keyboard.press("Enter");
+    await expect(counter(page)).toContainText("02 / 80");
+
+    // друге питання — вже «вписати», тож відповідаємо нейтрально до типу
+    await answerCurrent(page);
+    await page.keyboard.press("Enter");
+    await expect(counter(page)).toContainText("03 / 80");
+  });
+
+  test("без відповіді Enter нікуди не веде", async ({ page }) => {
+    await startTest(page);
+    await expect(questionCard(page).locator(".gd-hint")).toHaveText("Оберіть варіант, далі Enter.");
+
+    // жодного вибору не зроблено — гортання з клавіатури має стояти на місці
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter");
+    await expect(counter(page)).toContainText("01 / 80");
+
+    // а «Далі» лишається вільним: пропустити питання свідомим кліком можна
+    await page.getByRole("button", { name: "Далі", exact: true }).click();
+    await expect(counter(page)).toContainText("02 / 80");
+  });
+
+  test("на варіанті під фокусом перший Enter вибирає, другий гортає", async ({ page }) => {
+    await startTest(page);
+    await questionCard(page).locator(".gd-opt").nth(2).focus();
+
+    await page.keyboard.press("Enter");
+    await expect(questionCard(page).locator(".gd-opt").nth(2)).toHaveClass(/sel/);
+    await expect(counter(page)).toContainText("01 / 80");
+    await expect(questionCard(page).locator(".gd-hint")).toHaveText("Enter — наступне питання.");
+
+    await page.keyboard.press("Enter");
+    await expect(counter(page)).toContainText("02 / 80");
+  });
+
+  test("Enter після кліку по варіанту робить рівно один крок і не чіпає відповідей", async ({
+    page,
+  }) => {
+    await startTest(page);
+    const first = await questionText(page);
+    // клік лишає фокус на кнопці варіанта — саме тут раніше Enter не працював
+    await questionCard(page).locator(".gd-opt").nth(1).click();
+    await page.keyboard.press("Enter");
+
+    await expect(counter(page)).toContainText("02 / 80");
+    expect(await questionText(page)).not.toBe(first);
+    // на новому питанні нічого не вибрано: Enter не протягнув відповідь уперед
+    await expect(questionCard(page).locator(".gd-opt.sel")).toHaveCount(0);
+
+    // а вибір на попередньому питанні лишився тим самим
+    await page.getByRole("button", { name: "Назад" }).click();
+    await expect(questionCard(page).locator(".gd-opt.sel")).toHaveCount(1);
+    await expect(questionCard(page).locator(".gd-opt").nth(1)).toHaveClass(/sel/);
+  });
+
+  test("Enter гортає і питання з полем вводу", async ({ page }) => {
+    await startTest(page);
+    for (let i = 0; i < 10; i++) {
+      if ((await questionCard(page).locator("input.gd-input").count()) > 0) break;
+      await page.getByRole("button", { name: "Далі", exact: true }).click();
+    }
+    const input = questionCard(page).locator("input.gd-input");
+    await input.fill("is sleeping");
+    const before = await counter(page).innerText();
+
+    await page.keyboard.press("Enter");
+    await expect(counter(page)).not.toHaveText(before);
+    await expect(questionCard(page).locator(".gd-q")).toBeVisible();
+  });
+
+  test("Enter на кнопці «Далі» не перестрибує через питання", async ({ page }) => {
+    await startTest(page);
+    // відповідаємо, щоб крок не блокувався перевіркою на відповідь:
+    // тут перевіряється саме те, що кнопка не спрацьовує двічі
+    await answerCurrent(page);
+    await page.getByRole("button", { name: "Далі", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    // один крок, а не два: слухач window має пропустити подію кнопці
+    await expect(counter(page)).toContainText("02 / 80");
+  });
+
+  test("на останньому питанні Enter нічого не завершує", async ({ page }) => {
+    await startTest(page);
+    // позначки стрічки клікабельні — стрибаємо на останнє питання
+    await page.locator(".gd-tick.clickable").nth(79).click();
+    await expect(counter(page)).toContainText("80 / 80");
+
+    // теж із відповіддю: інакше тест пройшов би через перевірку на відповідь,
+    // а не через те, що з останнього питання Enter нікуди не веде
+    await answerCurrent(page);
+    await page.keyboard.press("Enter");
+    await expect(counter(page)).toContainText("80 / 80");
+    await expect(page.locator(".gd-big")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Завершити базову частину" })
+    ).toBeVisible();
+  });
+});
+
 test.describe("збереження на пристрої", () => {
   test("прогрес переживає перезавантаження вкладки", async ({ page }) => {
     await startTest(page);
