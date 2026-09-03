@@ -1,10 +1,13 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { POOL, SUITES } from "../data/questions.js";
 import { LEVELS, isRight } from "../lib/scoring.js";
 import { formatDate, pct, status } from "../lib/format.js";
+import { copyText } from "../lib/clipboard.js";
+import { AI_SERVICES, aiLink, buildAiPrompt, buildResultText, orderServices } from "../lib/export.js";
+import { KEYS, readJSON, writeJSON } from "../lib/storage.js";
 
 /* Звіт: рівень, розбивка по рівнях і темах, розбір помилок,
-   текстова версія для копіювання. */
+   експорт тексту і передача прогалин у ШІ. */
 export default function Report({
   results,
   items,
@@ -17,63 +20,57 @@ export default function Report({
   onReset,
   onHistory,
 }) {
-  const summaryRef = useRef(null);
+  // "" | "result" | "prompt" — що саме щойно скопіювали
   const [copied, setCopied] = useState("");
+  // текст, який не вдалося покласти в буфер: показуємо на екрані
+  const [manual, setManual] = useState(null);
+  // підказка після відкриття ШІ: чи промпт підставився в URL сам
+  const [opened, setOpened] = useState(null);
+  const [lastAi, setLastAi] = useState(null);
 
   const percent = pct(results.total / items.length);
   const sorted = [...results.perSuite].sort((a, b) => a.c / a.t - b.c / b.t);
 
-  const summaryText = [
-    `Результат тесту: ${results.level.label} — ${results.total}/${items.length} (${percent}%)`,
-    `Базова частина: ${results.baseTotal}/${sel.length}` +
-      (probes.length ? `, уточнення: ${probes.length} питань` : ""),
-    `За рівнями: ` +
-      LEVELS.map(
-        (l) => `${l} ${results.perLevel[l].c}/${results.perLevel[l].t} (${pct(results.rates[l])}%)`
-      ).join(", "),
-    ``,
-    `Теми від слабшої до сильнішої:`,
-    ...sorted.map((s) => `- ${s.name}: ${s.c}/${s.t} — ${status(s.c / s.t).t}`),
-  ].join("\n");
+  const payload = { pool: POOL, suites: SUITES, results, items, sel, probes, answers };
+  const resultText = useMemo(
+    () => buildResultText(payload),
+    [results, items, sel, probes, answers]
+  );
+  const promptText = useMemo(
+    () => buildAiPrompt(payload),
+    [results, items, sel, probes, answers]
+  );
 
-  const copy = async () => {
-    // 1) сучасний API — працює не в кожному контексті
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(summaryText);
-        setCopied("ok");
-        setTimeout(() => setCopied(""), 2500);
-        return;
-      }
-    } catch (e) {
-      /* пробуємо запасний шлях */
+  useEffect(() => {
+    readJSON(KEYS.ai, null).then((v) => setLastAi(v && v.id ? v.id : null));
+  }, []);
+
+  const services = orderServices(lastAi, AI_SERVICES);
+
+  const copy = async (kind, text) => {
+    setManual(null);
+    setOpened(null);
+    const res = await copyText(text);
+    if (res === "ok") {
+      setCopied(kind);
+      setTimeout(() => setCopied(""), 2500);
+      return;
     }
-    // 2) старий execCommand через виділення поля
-    try {
-      const ta = summaryRef.current;
-      if (ta) {
-        ta.readOnly = false;
-        ta.contentEditable = "true";
-        const range = document.createRange();
-        range.selectNodeContents(ta);
-        const s = window.getSelection();
-        s.removeAllRanges();
-        s.addRange(range);
-        ta.setSelectionRange(0, 999999);
-        const ok = document.execCommand("copy");
-        ta.readOnly = true;
-        ta.contentEditable = "false";
-        if (ok) {
-          setCopied("ok");
-          setTimeout(() => setCopied(""), 2500);
-          return;
-        }
-      }
-    } catch (e) {
-      /* лишається ручний спосіб */
-    }
-    // 3) текст уже виділено — користувач копіює сам
-    setCopied("manual");
+    // буфер недоступний — лишається виділити текст руками
+    setCopied("");
+    setManual({ kind, text });
+  };
+
+  /* Копіювання запускається в тому ж жесті, а перехід робить сам <a>:
+     window.open() після await ріже блокувальник спливаючих вікон. */
+  const openAi = (svc) => {
+    copyText(promptText);
+    setManual(null);
+    setCopied("");
+    setOpened({ name: svc.name, prefilled: aiLink(svc, promptText) !== svc.base });
+    setLastAi(svc.id);
+    // збій запису тут нічого не ламає: зміниться лише порядок кнопок
+    writeJSON(KEYS.ai, { id: svc.id }).catch(() => {});
   };
 
   return (
@@ -199,37 +196,81 @@ export default function Report({
       </div>
 
       <div className="gd-sec">
-        <h3>Звіт текстом</h3>
+        <h3>Результати тесту</h3>
         <p className="gd-lead" style={{ marginBottom: 10 }}>
-          Скопіюйте і надішліть у чат — за цими даними я зберу уроки саме по ваших прогалинах.
+          Рівень, розбивка по темах і всі помилки з питаннями та правильними відповідями.
         </p>
         {storeOk === false && (
           <p className="gd-note" style={{ marginTop: 0, marginBottom: 10, color: "var(--bad)" }}>
-            ⚠ Цей звіт зараз не зберігається на пристрої. Скопіюйте текст нижче, перш ніж
-            закривати вкладку — інакше результати зникнуть.
+            ⚠ Цей звіт зараз не зберігається на пристрої. Скопіюйте результати кнопкою нижче,
+            перш ніж закривати вкладку — інакше вони зникнуть.
           </p>
         )}
-        <textarea
-          ref={summaryRef}
-          className="gd-input"
-          readOnly
-          rows={10}
-          value={summaryText}
-          style={{ fontSize: 13, lineHeight: 1.6, resize: "vertical" }}
-          onFocus={(e) => e.target.select()}
-        />
-        <div className="gd-nav">
-          <button className="gd-btn acc" style={{ flex: 1 }} onClick={copy}>
-            {copied === "ok" ? "Скопійовано" : "Скопіювати звіт"}
+        <div className="gd-nav" style={{ marginTop: 0 }}>
+          <button
+            className="gd-btn acc wide"
+            onClick={() => copy("result", resultText)}
+          >
+            {copied === "result" ? "Скопійовано" : "Скопіювати результати тесту"}
           </button>
         </div>
-        {copied === "manual" && (
-          <p className="gd-note" style={{ marginTop: 4 }}>
-            Браузер не дав доступу до буфера обміну. Текст уже виділено — натисніть і утримуйте
-            поле вище, далі «Копіювати».
+      </div>
+
+      <div className="gd-sec">
+        <h3>План навчання від ШІ</h3>
+        <p className="gd-lead" style={{ marginBottom: 10 }}>
+          Промпт із вашими прогалинами — без окремих питань. Скопіюйте і вставте у ШІ, або
+          одразу відкрийте потрібний: промпт при цьому теж лягає в буфер.
+        </p>
+        <div className="gd-nav" style={{ marginTop: 0 }}>
+          <button className="gd-btn wide" onClick={() => copy("prompt", promptText)}>
+            {copied === "prompt" ? "Скопійовано" : "Скопіювати промпт"}
+          </button>
+        </div>
+        <p className="gd-note" style={{ marginBottom: 0 }}>
+          Відкрити з промптом:
+        </p>
+        <div className="gd-ai">
+          {services.map((svc) => (
+            <a
+              key={svc.id}
+              className="gd-btn ghost sm"
+              href={aiLink(svc, promptText)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => openAi(svc)}
+            >
+              {svc.name} ↗
+            </a>
+          ))}
+        </div>
+        {opened && (
+          <p className="gd-note">
+            {opened.prefilled
+              ? `${opened.name} відкривається з готовим промптом. Якщо поле порожнє — вставте з буфера (Ctrl+V).`
+              : `${opened.name} не приймає промпт через посилання. Промпт уже в буфері — вставте його (Ctrl+V).`}
           </p>
         )}
       </div>
+
+      {/* Аварійний шлях: буфер недоступний, лишається виділити текст руками. */}
+      {manual && (
+        <div className="gd-sec">
+          <h3>{manual.kind === "result" ? "Результати тесту" : "Промпт для ШІ"} — текстом</h3>
+          <p className="gd-note" style={{ marginTop: 0, marginBottom: 10, color: "var(--bad)" }}>
+            Браузер не дав доступу до буфера обміну. Текст виділено — скопіюйте вручну.
+          </p>
+          <textarea
+            className="gd-input"
+            autoFocus
+            readOnly
+            rows={12}
+            value={manual.text}
+            style={{ fontSize: 13, lineHeight: 1.6, resize: "vertical" }}
+            onFocus={(e) => e.target.select()}
+          />
+        </div>
+      )}
 
       <div className="gd-nav">
         <button className="gd-btn ghost wide" onClick={onReset}>

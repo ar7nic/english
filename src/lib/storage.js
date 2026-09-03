@@ -22,6 +22,7 @@ export const KEYS = {
   progress: `${PREFIX}progress:v1`,
   usage: `${PREFIX}usage:v1`,
   attempts: `${PREFIX}attempts:v1`,
+  ai: `${PREFIX}ai:v1`,
 };
 
 /* Тонка обгортка над localStorage: у приватному вікні або з вимкненими

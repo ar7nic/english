@@ -26,8 +26,17 @@ test.describe("проходження", () => {
     await expect(page.getByRole("heading", { name: /За темами/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Розбір помилок/ })).toBeVisible();
     await expect(page.locator(".gd-row .gd-rowname").first()).toBeVisible();
-    // текстовий звіт заповнений
-    await expect(page.locator("textarea.gd-input")).toHaveValue(/Результат тесту:/);
+    // експорт розділено на дві дії: сирі результати і промпт для ШІ
+    await expect(page.getByRole("button", { name: "Скопіювати результати тесту" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Скопіювати промпт" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /ChatGPT/ })).toHaveAttribute(
+      "href",
+      /^https:\/\/chatgpt\.com\//
+    );
+    await expect(page.getByRole("link", { name: /Gemini/ })).toHaveAttribute(
+      "href",
+      "https://gemini.google.com/app"
+    );
   });
 
   test("слабкі теми отримують фазу уточнень", async ({ page }) => {

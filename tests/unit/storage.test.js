@@ -50,9 +50,9 @@ describe("адаптер сховища", () => {
     await expect(blocked.get("k")).rejects.toThrow("доступ заблоковано");
   });
 
-  it("тримає три незалежні ключі", () => {
+  it("тримає незалежні ключі під спільним префіксом", () => {
     const keys = Object.values(KEYS);
-    expect(new Set(keys).size).toBe(3);
+    expect(new Set(keys).size).toBe(keys.length);
     keys.forEach((k) => expect(k.startsWith("grammar-diagnostic:")).toBe(true));
   });
 });

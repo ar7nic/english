@@ -78,6 +78,8 @@ html,body,#root{margin:0;padding:0;min-height:100%;background:#EDF0F4;}
 .gd-btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule);}
 .gd-btn.wide{width:100%;}
 .gd-btn.acc{background:var(--acc);border-color:var(--acc);}
+a.gd-btn{display:inline-flex;align-items:center;text-decoration:none;}
+.gd-ai{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
 
 /* results */
 .gd-score{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:6px 0 4px;}
