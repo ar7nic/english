@@ -45,8 +45,9 @@ export default function Question({
       // інакше вийшов би подвійний перехід
       if (target instanceof HTMLButtonElement && !onOption) return;
 
-      // Enter — це «відповів і далі», а не «пропустити»: без відповіді
-      // він нікуди не веде. Пропуск питання лишається свідомим кліком.
+      // Enter — це «відповів і далі», без відповіді він нікуди не веде,
+      // так само як і сама кнопка «Далі» (вона disabled, поки немає
+      // відповіді) — питання не можна пропустити взагалі.
       // Дефолт тут навмисно не гасимо: якщо фокус стоїть на варіанті,
       // цей самий Enter його вибере, і наступний уже погортає.
       if (!answered) return;
@@ -156,15 +157,25 @@ export default function Question({
             Назад
           </button>
           {atBaseEnd ? (
-            <button className="gd-btn acc" style={{ flex: 1 }} onClick={onFinishBase}>
+            <button
+              className="gd-btn acc"
+              style={{ flex: 1 }}
+              onClick={onFinishBase}
+              disabled={!answered}
+            >
               Завершити базову частину
             </button>
           ) : last ? (
-            <button className="gd-btn acc" style={{ flex: 1 }} onClick={onDone}>
+            <button className="gd-btn acc" style={{ flex: 1 }} onClick={onDone} disabled={!answered}>
               Завершити і показати звіт
             </button>
           ) : (
-            <button className="gd-btn" style={{ flex: 1 }} onClick={() => onGo(idx + 1)}>
+            <button
+              className="gd-btn"
+              style={{ flex: 1 }}
+              onClick={() => onGo(idx + 1)}
+              disabled={!answered}
+            >
               Далі
             </button>
           )}

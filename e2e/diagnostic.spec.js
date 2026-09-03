@@ -76,7 +76,7 @@ test.describe("клавіатура", () => {
     await expect(counter(page)).toContainText("03 / 80");
   });
 
-  test("без відповіді Enter нікуди не веде", async ({ page }) => {
+  test("без відповіді ні Enter, ні «Далі» нікуди не ведуть", async ({ page }) => {
     await startTest(page);
     await expect(questionCard(page).locator(".gd-hint")).toHaveText("Оберіть варіант, далі Enter.");
 
@@ -85,7 +85,10 @@ test.describe("клавіатура", () => {
     await page.keyboard.press("Enter");
     await expect(counter(page)).toContainText("01 / 80");
 
-    // а «Далі» лишається вільним: пропустити питання свідомим кліком можна
+    // «Далі» без відповіді заблокована — питання не можна пропустити
+    await expect(page.getByRole("button", { name: "Далі", exact: true })).toBeDisabled();
+
+    await answerCurrent(page);
     await page.getByRole("button", { name: "Далі", exact: true }).click();
     await expect(counter(page)).toContainText("02 / 80");
   });
@@ -127,6 +130,7 @@ test.describe("клавіатура", () => {
     await startTest(page);
     for (let i = 0; i < 10; i++) {
       if ((await questionCard(page).locator("input.gd-input").count()) > 0) break;
+      await answerCurrent(page);
       await page.getByRole("button", { name: "Далі", exact: true }).click();
     }
     const input = questionCard(page).locator("input.gd-input");
@@ -201,6 +205,7 @@ test.describe("збереження на пристрої", () => {
     // шукаємо перше питання з полем вводу
     for (let i = 0; i < 10; i++) {
       if ((await questionCard(page).locator("input.gd-input").count()) > 0) break;
+      await answerCurrent(page);
       await page.getByRole("button", { name: "Далі", exact: true }).click();
     }
     const input = questionCard(page).locator("input.gd-input");
